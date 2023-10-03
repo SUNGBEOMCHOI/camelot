@@ -4,6 +4,8 @@ from typing import Union
 
 from pypdf._utils import StrByteType
 
+from .core import TableList
+from .parsers import Lattice, Stream
 from .handlers import PDFHandler
 from .utils import remove_extra
 from .utils import validate_input
@@ -111,15 +113,59 @@ def read_pdf(
         raise NotImplementedError(
             "Unknown flavor specified." " Use either 'lattice' or 'stream'"
         )
-
     with warnings.catch_warnings():
         if suppress_stdout:
             warnings.simplefilter("ignore")
-
         validate_input(kwargs, flavor=flavor)
         p = PDFHandler(filepath, pages=pages, password=password)
         kwargs = remove_extra(kwargs, flavor=flavor)
-        tables = p.parse(
+        tables = p.parse( 
+            flavor=flavor,
+            suppress_stdout=suppress_stdout,
+            layout_kwargs=layout_kwargs,
+            **kwargs
+        )
+        return tables
+
+def page_parse(
+        imagepath, layout, flavor="lattice", suppress_stdout=False, layout_kwargs=None, **kwargs
+    ):
+    if layout_kwargs is None:
+        layout_kwargs = {}
+
+    tables = []
+    width = layout.bbox[2]
+    height = layout.bbox[3]
+    dim = (width, height)
+    parser = Lattice(**kwargs) if flavor == "lattice" else Stream(**kwargs)
+    t = parser.extract_table_from_image(
+        imagename=imagepath, suppress_stdout=suppress_stdout, layout_kwargs=layout_kwargs, layout=layout, dim=dim
+    )
+    tables.extend(t)
+    return TableList(sorted(tables))
+
+def layout_pdf(
+    imagepath=None,
+    layout=None,
+    flavor="lattice",
+    suppress_stdout=False,
+    layout_kwargs=None,
+    **kwargs
+):
+    if layout_kwargs is None:
+        layout_kwargs = {}
+    if flavor not in ["lattice", "stream"]:
+        raise NotImplementedError(
+            "Unknown flavor specified." " Use either 'lattice' or 'stream'"
+        )
+    with warnings.catch_warnings():
+        if suppress_stdout:
+            warnings.simplefilter("ignore")
+        validate_input(kwargs, flavor=flavor)
+        kwargs = remove_extra(kwargs, flavor=flavor)
+        tables = page_parse( 
+            imagepath=imagepath,
+            layout = layout,
             flavor=flavor,
             suppress_stdout=suppress_stdout,
             layout_kwargs=layout_kwargs,

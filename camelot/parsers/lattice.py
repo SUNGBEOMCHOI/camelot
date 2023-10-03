@@ -425,3 +425,35 @@ class Lattice(BaseParser):
             _tables.append(table)
 
         return _tables
+
+    def extract_table_from_image(self, filename=None, imagename=None, suppress_stdout=False, layout_kwargs={}, layout=None, dim=None):
+        self._generate_layout(filename, imagename, layout_kwargs, layout, dim)
+        if filename is not None:
+            if not suppress_stdout:
+                logger.info(f"Processing {os.path.basename(self.rootname)}")
+
+            self.backend.convert(self.filename, self.imagename)
+
+        if not self.horizontal_text:
+            if self.images:
+                warnings.warn(
+                    "{} is image-based, camelot only works on"
+                    " text-based pages.".format(self.imagename)
+                )
+            else:
+                warnings.warn(f"No tables found on {self.imagename}")
+            return []
+
+        self._generate_table_bbox()
+
+        _tables = []
+        # sort tables based on y-coord
+        for table_idx, tk in enumerate(
+            sorted(self.table_bbox.keys(), key=lambda x: x[1], reverse=True)
+        ):
+            cols, rows, v_s, h_s = self._generate_columns_and_rows(table_idx, tk)
+            table = self._generate_table(table_idx, cols, rows, v_s=v_s, h_s=h_s)
+            table._bbox = tk
+            _tables.append(table)
+
+        return _tables
